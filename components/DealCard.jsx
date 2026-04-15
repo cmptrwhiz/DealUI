@@ -1,3 +1,5 @@
+import { getDealRelevance } from "../data/dealRelevance.js";
+
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -48,6 +50,8 @@ function TextList({ title, items, empty }) {
 }
 
 export default function DealCard({ deal }) {
+  const relevance = deal.relevance || getDealRelevance(deal.profile?.dealStrategy);
+
   return (
     <section className="panel deal-card">
       <div className="score-header">
@@ -92,57 +96,87 @@ export default function DealCard({ deal }) {
         </div>
       </div>
 
-      <div className="inspection-grid">
-        <div className="inspection-list">
-          <h3>Perceived vs real</h3>
-          <dl className="mini-grid">
-            <Metric label="Reported NOI" value={formatMoney(deal.metrics.perceivedNoi)} />
-            <Metric label="Real NOI" value={formatMoney(deal.metrics.realNoi)} />
-            <Metric label="Stressed NOI" value={formatMoney(deal.metrics.stressedNoi)} />
-            <Metric label="Reported expenses" value={formatMoney(deal.metrics.expensesReported)} />
-            <Metric label="Normalized expenses" value={formatMoney(deal.metrics.normalizedExpenses)} />
-            <Metric label="Truth delta" value={formatMoney(deal.metrics.perceivedNoi - deal.metrics.realNoi)} />
-          </dl>
-        </div>
+      {relevance.showNOI && (
+        <div className="inspection-grid">
+          <div className="inspection-list">
+            <h3>Perceived vs real</h3>
+            <dl className="mini-grid">
+              <Metric label="Reported NOI" value={formatMoney(deal.metrics.perceivedNoi)} />
+              <Metric label="Real NOI" value={formatMoney(deal.metrics.realNoi)} />
+              <Metric label="Stressed NOI" value={formatMoney(deal.metrics.stressedNoi)} />
+              <Metric label="Reported expenses" value={formatMoney(deal.metrics.expensesReported)} />
+              <Metric label="Normalized expenses" value={formatMoney(deal.metrics.normalizedExpenses)} />
+              <Metric label="Truth delta" value={formatMoney(deal.metrics.perceivedNoi - deal.metrics.realNoi)} />
+            </dl>
+          </div>
 
-        <div className="inspection-list">
-          <h3>Downside first</h3>
-          <dl className="mini-grid">
-            <Metric label="Cash flow" value={formatMoney(deal.metrics.cashFlow)} />
-            <Metric label="Burn rate" value={formatMoney(deal.metrics.burnRate)} />
-            <Metric label="Survival months" value={deal.metrics.survivalMonths >= 999 ? "999+" : formatNumber(deal.metrics.survivalMonths)} />
-            <Metric label="Debt service" value={formatMoney(deal.metrics.debtService)} />
-            <Metric label="Market cap" value={formatPercent(deal.metrics.marketCap)} />
-            <Metric label="Discount" value={formatMoney(deal.metrics.discount)} />
-          </dl>
+          <div className="inspection-list">
+            <h3>Downside first</h3>
+            <dl className="mini-grid">
+              <Metric label="Cash flow" value={formatMoney(deal.metrics.cashFlow)} />
+              <Metric label="Burn rate" value={formatMoney(deal.metrics.burnRate)} />
+              <Metric label="Survival months" value={deal.metrics.survivalMonths >= 999 ? "999+" : formatNumber(deal.metrics.survivalMonths)} />
+              <Metric label="Debt service" value={formatMoney(deal.metrics.debtService)} />
+              <Metric label="Market cap" value={formatPercent(deal.metrics.marketCap)} />
+              <Metric label="Discount" value={formatMoney(deal.metrics.discount)} />
+            </dl>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="inspection-grid">
-        <div className="inspection-list">
-          <h3>Rent roll</h3>
-          <dl className="mini-grid">
-            <Metric label="In-place rent" value={formatMoney(deal.metrics.rentInPlace)} />
-            <Metric label="Market rent" value={formatMoney(deal.metrics.rentMarket)} />
-            <Metric label="Realistic rent" value={formatMoney(deal.metrics.rentRealistic)} />
-            <Metric label="Rent gap" value={formatMoney(deal.metrics.rentGap)} />
-            <Metric label="Upside score" value={formatPercent(deal.metrics.upsideScore)} />
-            <Metric label="Units parsed" value={deal.rentRoll.unitAnalysis.length} />
-          </dl>
-        </div>
+      {relevance.showRentRoll && (
+        <div className="inspection-grid">
+          <div className="inspection-list">
+            <h3>Rent roll</h3>
+            <dl className="mini-grid">
+              <Metric label="In-place rent" value={formatMoney(deal.metrics.rentInPlace)} />
+              <Metric label="Market rent" value={formatMoney(deal.metrics.rentMarket)} />
+              <Metric label="Realistic rent" value={formatMoney(deal.metrics.rentRealistic)} />
+              <Metric label="Rent gap" value={formatMoney(deal.metrics.rentGap)} />
+              <Metric label="Upside score" value={formatPercent(deal.metrics.upsideScore)} />
+              <Metric label="Units parsed" value={deal.rentRoll.unitAnalysis.length} />
+            </dl>
+          </div>
 
-        <div className="inspection-list">
-          <h3>Valuation</h3>
-          <dl className="mini-grid">
-            <Metric label="Value" value={formatMoney(deal.metrics.value)} />
-            <Metric label="Basis" value={formatMoney(deal.metrics.basis)} />
-            <Metric label="Cap rate" value={formatPercent(deal.metrics.capRate)} />
-            <Metric label="DSCR" value={`${deal.metrics.dscr.toFixed(2)}x`} />
-            <Metric label="Loan" value={formatMoney(deal.metrics.loan)} />
-            <Metric label="Expense ratio" value={formatPercent(deal.metrics.expenseRatio)} />
-          </dl>
+          <div className="inspection-list">
+            <h3>Income valuation</h3>
+            <dl className="mini-grid">
+              <Metric label="Value" value={formatMoney(deal.metrics.value)} />
+              <Metric label="Basis" value={formatMoney(deal.metrics.basis)} />
+              <Metric label="Cap rate" value={formatPercent(deal.metrics.capRate)} />
+              <Metric label="DSCR" value={`${deal.metrics.dscr.toFixed(2)}x`} />
+              <Metric label="Loan" value={formatMoney(deal.metrics.loan)} />
+              <Metric label="Expense ratio" value={formatPercent(deal.metrics.expenseRatio)} />
+            </dl>
+          </div>
         </div>
-      </div>
+      )}
+
+      {relevance.showExitMath && (
+        <div className="inspection-grid">
+          <div className="inspection-list">
+            <h3>Exit math</h3>
+            <dl className="mini-grid">
+              <Metric label="ARV / exit value" value={formatMoney(deal.metrics.exitValue)} />
+              <Metric label="Project cost" value={formatMoney(deal.metrics.projectCost)} />
+              <Metric label="Exit spread" value={formatPercent(deal.metrics.exitSpread)} />
+              <Metric label="Equity created" value={formatMoney(deal.metrics.equityCreated)} />
+              <Metric label="Holding costs" value={formatMoney(deal.metrics.holdingCostEstimate)} />
+              <Metric label="Resale costs" value={formatMoney(deal.metrics.resaleCosts)} />
+            </dl>
+          </div>
+
+          <div className="inspection-list">
+            <h3>Downside first</h3>
+            <dl className="mini-grid">
+              <Metric label="Debt service" value={formatMoney(deal.metrics.debtService)} />
+              <Metric label="Burn rate" value={formatMoney(deal.metrics.burnRate)} />
+              <Metric label="Survival months" value={deal.metrics.survivalMonths >= 999 ? "999+" : formatNumber(deal.metrics.survivalMonths)} />
+              <Metric label="Loan" value={formatMoney(deal.metrics.loan)} />
+            </dl>
+          </div>
+        </div>
+      )}
 
       <div className="inspection-grid">
         <div className="inspection-list">

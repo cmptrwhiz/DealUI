@@ -6,6 +6,7 @@ import {
   diligenceItems,
   offerTypes
 } from "../data/dealTaxonomy.js";
+import { getDealRelevance } from "../data/dealRelevance.js";
 import { scoreDeal } from "../services/api.js";
 
 const initialForm = {
@@ -88,6 +89,7 @@ export default function DealForm({ onResult }) {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const relevance = getDealRelevance(form.dealStrategy);
 
   const updateField = (field) => (event) => {
     const value =
@@ -312,39 +314,41 @@ export default function DealForm({ onResult }) {
         </div>
       </section>
 
-      <section className="form-section">
-        <h3>Rent roll and leases</h3>
-        <div className="field-grid three">
-          <Field label="Annual current rent">
-            <input inputMode="decimal" value={form.grossRent} onChange={updateField("grossRent")} placeholder="108000" />
+      {relevance.showRentRoll && (
+        <section className="form-section">
+          <h3>Rent roll and leases</h3>
+          <div className="field-grid three">
+            <Field label="Annual current rent">
+              <input inputMode="decimal" value={form.grossRent} onChange={updateField("grossRent")} placeholder="108000" />
+            </Field>
+            <Field label="Annual market rent">
+              <input inputMode="decimal" value={form.marketRent} onChange={updateField("marketRent")} placeholder="124000" />
+            </Field>
+            <Field label="Realistic market rent">
+              <input inputMode="decimal" value={form.realisticMarketRent} onChange={updateField("realisticMarketRent")} placeholder="118000" />
+            </Field>
+            <Field label="Occupancy %">
+              <input inputMode="decimal" value={form.occupancy} onChange={updateField("occupancy")} placeholder="92" />
+            </Field>
+            <Field label="Lease count">
+              <input inputMode="decimal" value={form.leaseCount} onChange={updateField("leaseCount")} placeholder="10" />
+            </Field>
+            <Field label="Average lease months left">
+              <input inputMode="decimal" value={form.avgLeaseMonths} onChange={updateField("avgLeaseMonths")} placeholder="8" />
+            </Field>
+            <Field label="Expiring in 90 days">
+              <input inputMode="decimal" value={form.leaseExpirations} onChange={updateField("leaseExpirations")} placeholder="2" />
+            </Field>
+          </div>
+          <Field label="Unit rent roll paste">
+            <textarea
+              value={form.rentRollText}
+              onChange={updateField("rentRollText")}
+              placeholder={"Unit 1, 1200, 1450, occupied\nUnit 2, 0, 1500, vacant"}
+            />
           </Field>
-          <Field label="Annual market rent">
-            <input inputMode="decimal" value={form.marketRent} onChange={updateField("marketRent")} placeholder="124000" />
-          </Field>
-          <Field label="Realistic market rent">
-            <input inputMode="decimal" value={form.realisticMarketRent} onChange={updateField("realisticMarketRent")} placeholder="118000" />
-          </Field>
-          <Field label="Occupancy %">
-            <input inputMode="decimal" value={form.occupancy} onChange={updateField("occupancy")} placeholder="92" />
-          </Field>
-          <Field label="Lease count">
-            <input inputMode="decimal" value={form.leaseCount} onChange={updateField("leaseCount")} placeholder="10" />
-          </Field>
-          <Field label="Average lease months left">
-            <input inputMode="decimal" value={form.avgLeaseMonths} onChange={updateField("avgLeaseMonths")} placeholder="8" />
-          </Field>
-          <Field label="Expiring in 90 days">
-            <input inputMode="decimal" value={form.leaseExpirations} onChange={updateField("leaseExpirations")} placeholder="2" />
-          </Field>
-        </div>
-        <Field label="Unit rent roll paste">
-          <textarea
-            value={form.rentRollText}
-            onChange={updateField("rentRollText")}
-            placeholder={"Unit 1, 1200, 1450, occupied\nUnit 2, 0, 1500, vacant"}
-          />
-        </Field>
-      </section>
+        </section>
+      )}
 
       <section className="form-section">
         <h3>Expenses and statements</h3>
@@ -371,13 +375,15 @@ export default function DealForm({ onResult }) {
             <input inputMode="decimal" value={form.securityDeposits} onChange={updateField("securityDeposits")} placeholder="12000" />
           </Field>
         </div>
-        <Field label="T12 paste">
-          <textarea
-            value={form.t12Text}
-            onChange={updateField("t12Text")}
-            placeholder={"Rental income 100000\nTaxes 18000\nInsurance 12000\nRepairs 10000\nUtilities 6000"}
-          />
-        </Field>
+        {relevance.showT12 && (
+          <Field label="T12 paste">
+            <textarea
+              value={form.t12Text}
+              onChange={updateField("t12Text")}
+              placeholder={"Rental income 100000\nTaxes 18000\nInsurance 12000\nRepairs 10000\nUtilities 6000"}
+            />
+          </Field>
+        )}
       </section>
 
       <section className="form-section">
@@ -386,9 +392,11 @@ export default function DealForm({ onResult }) {
           <Field label="Renovation budget">
             <input inputMode="decimal" value={form.renovationBudget} onChange={updateField("renovationBudget")} placeholder="85000" />
           </Field>
-          <Field label="Assignment fee">
-            <input inputMode="decimal" value={form.assignmentFee} onChange={updateField("assignmentFee")} placeholder="25000" />
-          </Field>
+          {relevance.showAssignment && (
+            <Field label="Assignment fee">
+              <input inputMode="decimal" value={form.assignmentFee} onChange={updateField("assignmentFee")} placeholder="25000" />
+            </Field>
+          )}
           <Field label="Closing costs">
             <input inputMode="decimal" value={form.closingCosts} onChange={updateField("closingCosts")} placeholder="18000" />
           </Field>
@@ -398,39 +406,51 @@ export default function DealForm({ onResult }) {
           <Field label="Resale costs">
             <input inputMode="decimal" value={form.resaleCosts} onChange={updateField("resaleCosts")} placeholder="55000" />
           </Field>
-          <Field label="STR ADR">
-            <input inputMode="decimal" value={form.adr} onChange={updateField("adr")} placeholder="225" />
-          </Field>
-          <Field label="STR occupancy %">
-            <input inputMode="decimal" value={form.shortTermOccupancy} onChange={updateField("shortTermOccupancy")} placeholder="62" />
-          </Field>
-          <Field label="Furnishing budget">
-            <input inputMode="decimal" value={form.furnishingBudget} onChange={updateField("furnishingBudget")} placeholder="35000" />
-          </Field>
-          <Field label="Down payment">
-            <input inputMode="decimal" value={form.downPayment} onChange={updateField("downPayment")} placeholder="170000" />
-          </Field>
-          <Field label="Interest rate %">
-            <input inputMode="decimal" value={form.interestRate} onChange={updateField("interestRate")} placeholder="6.5" />
-          </Field>
-          <Field label="LTV %">
-            <input inputMode="decimal" value={form.ltv} onChange={updateField("ltv")} placeholder="70" />
-          </Field>
+          {relevance.showShortTerm && (
+            <>
+              <Field label="STR ADR">
+                <input inputMode="decimal" value={form.adr} onChange={updateField("adr")} placeholder="225" />
+              </Field>
+              <Field label="STR occupancy %">
+                <input inputMode="decimal" value={form.shortTermOccupancy} onChange={updateField("shortTermOccupancy")} placeholder="62" />
+              </Field>
+              <Field label="Furnishing budget">
+                <input inputMode="decimal" value={form.furnishingBudget} onChange={updateField("furnishingBudget")} placeholder="35000" />
+              </Field>
+            </>
+          )}
+          {relevance.showFinancing && (
+            <>
+              <Field label="Down payment">
+                <input inputMode="decimal" value={form.downPayment} onChange={updateField("downPayment")} placeholder="170000" />
+              </Field>
+              <Field label="Interest rate %">
+                <input inputMode="decimal" value={form.interestRate} onChange={updateField("interestRate")} placeholder="6.5" />
+              </Field>
+              <Field label="LTV %">
+                <input inputMode="decimal" value={form.ltv} onChange={updateField("ltv")} placeholder="70" />
+              </Field>
+            </>
+          )}
           <Field label="Reserves">
             <input inputMode="decimal" value={form.reserves} onChange={updateField("reserves")} placeholder="100000" />
           </Field>
           <Field label="Amortization years">
             <input inputMode="decimal" value={form.amortizationYears} onChange={updateField("amortizationYears")} placeholder="30" />
           </Field>
-          <Field label="Seller carry rate %">
-            <input inputMode="decimal" value={form.sellerCarryRate} onChange={updateField("sellerCarryRate")} placeholder="4.5" />
-          </Field>
-          <Field label="Seller carry term months">
-            <input inputMode="decimal" value={form.sellerCarryTerm} onChange={updateField("sellerCarryTerm")} placeholder="60" />
-          </Field>
-          <Field label="Option fee">
-            <input inputMode="decimal" value={form.optionFee} onChange={updateField("optionFee")} placeholder="10000" />
-          </Field>
+          {relevance.showSellerTerms && (
+            <>
+              <Field label="Seller carry rate %">
+                <input inputMode="decimal" value={form.sellerCarryRate} onChange={updateField("sellerCarryRate")} placeholder="4.5" />
+              </Field>
+              <Field label="Seller carry term months">
+                <input inputMode="decimal" value={form.sellerCarryTerm} onChange={updateField("sellerCarryTerm")} placeholder="60" />
+              </Field>
+              <Field label="Option fee">
+                <input inputMode="decimal" value={form.optionFee} onChange={updateField("optionFee")} placeholder="10000" />
+              </Field>
+            </>
+          )}
           <Field label="1031 deadline days left">
             <input inputMode="decimal" value={form.exchangeDeadlineDays} onChange={updateField("exchangeDeadlineDays")} placeholder="35" />
           </Field>

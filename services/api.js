@@ -1,4 +1,5 @@
 import { diligenceItems } from "../data/dealTaxonomy.js";
+import { getDealRelevance } from "../data/dealRelevance.js";
 
 const API_URL = import.meta.env.VITE_DEAL_API_URL;
 
@@ -134,21 +135,21 @@ function propertyTax(data) {
   };
 }
 
-function truthScore({ noiReported, noiReal, rentMarket, realisticMarket, expensesReported, rentInPlace, missingData }) {
+function truthScore({ isIncome, noiReported, noiReal, rentMarket, realisticMarket, expensesReported, rentInPlace, missingData }) {
   let score = 100;
   const flags = [];
 
-  if (noiReported > noiReal * 1.2) {
+  if (isIncome && noiReported > noiReal * 1.2) {
     score -= 25;
     flags.push("Reported NOI is more than 20% above normalized NOI.");
   }
 
-  if (realisticMarket && rentMarket > realisticMarket * 1.1) {
+  if (isIncome && realisticMarket && rentMarket > realisticMarket * 1.1) {
     score -= 20;
     flags.push("Market rent claim is more than 10% above realistic market input.");
   }
 
-  if (expensesReported < rentInPlace * 0.25) {
+  if (isIncome && expensesReported < rentInPlace * 0.25) {
     score -= 20;
     flags.push("Reported expenses are below 25% of in-place rent.");
   }
@@ -167,8 +168,15 @@ function truthScore({ noiReported, noiReal, rentMarket, realisticMarket, expense
 function classifyDeal({ discount, riskScoreValue, capRate, marketCap, upsideScore }) {
   if (discount > 0 && riskScoreValue < 5) return "VALUE BUY";
   if (riskScoreValue > 7 && discount > 0) return "DISTRESS OPPORTUNITY";
-  if (capRate < marketCap && upsideScore < 0.05) return "RETAIL TRAP";
+  if (capRate < marketCap && upsideScore < 0.05) return "OVERPRICED STORY";
   return "MID DEAL";
+}
+
+function classifyExitDeal({ spread, riskScoreValue }) {
+  if (spread >= 0.18 && riskScoreValue < 6) return "SPREAD DEAL";
+  if (spread >= 0.12 && riskScoreValue >= 6) return "DISTRESS OPPORTUNITY";
+  if (spread < 0) return "OVERPRICED STORY";
+  return "THIN SPREAD";
 }
 
 function survivalLabel(months) {
@@ -184,13 +192,14 @@ function recommendedActions({ dealType, survivalScore, truth, sellerPressureValu
   if (survivalScore === "DANGEROUS") actions.push("Pass unless seller restructures price, debt, or carry terms.");
   if (sellerPressureValue > 3 && discount > 0) actions.push("Open with a low anchor and let time work.");
   if (dealType === "DISTRESS OPPORTUNITY") actions.push("Negotiate aggressively with environmental, flood, lease, and capex contingencies.");
-  if (dealType === "RETAIL TRAP") actions.push("Do not pay for speculative upside that cannot be reached under restrictions.");
+  if (dealType === "OVERPRICED STORY") actions.push("Do not pay for speculative upside that cannot be verified.");
   if (!actions.length) actions.push("Monitor, validate comps, and sharpen the offer only after diligence improves.");
 
   return actions;
 }
 
 function scoreLocally(data) {
+  const relevance = getDealRelevance(data.profile.dealStrategy);
   const t12 = parseT12(data.ingestion.t12Text);
   const unitRoll = parseRentRoll(data.ingestion.rentRollText);
   const diligence = diligenceCoverage(data.diligence);
@@ -212,8 +221,22 @@ function scoreLocally(data) {
   const noiReal = rentInPlace - (tax + insurance + maintenance + otherExpenses);
   const noiStressed = noiReal * 0.8;
   const marketCap = 0.06 + riskAdjustment(data);
-  const value = marketCap ? noiReal / marketCap : 0;
-  const discount = value - data.property.price;
+  const incomeValue = marketCap ? noiReal / marketCap : 0;
+  const exitValue = data.property.arv || data.property.price;
+  const resaleCosts = data.strategy.resaleCosts || (relevance.isExit ? exitValue * 0.06 : 0);
+  const holdingCostEstimate =
+    ((tax + insurance + maintenance + otherExpenses + data.property.price * data.strategy.interestRate * data.strategy.ltv) / 12) *
+    data.strategy.holdingMonths;
+  const projectCost =
+    data.property.price +
+    data.strategy.renovationBudget +
+    data.strategy.closingCosts +
+    data.strategy.furnishingBudget +
+    resaleCosts +
+    holdingCostEstimate;
+  const exitSpread = exitValue ? (exitValue - projectCost) / exitValue : 0;
+  const value = relevance.isExit ? exitValue : incomeValue;
+  const discount = relevance.isExit ? exitValue - projectCost : value - data.property.price;
   const discountRatio = data.property.price ? discount / data.property.price : 0;
   const loan = data.property.price * data.strategy.ltv;
   const debtService = loan * data.strategy.interestRate;
@@ -223,6 +246,7 @@ function scoreLocally(data) {
   const survivalScore = survivalLabel(survivalMonths);
   const missingData = diligence.ratio < 0.7;
   const truth = truthScore({
+    isIncome: relevance.isIncome,
     noiReported,
     noiReal,
     rentMarket,
@@ -234,21 +258,24 @@ function scoreLocally(data) {
   const riskScoreValue = riskScore(data, vacancy);
   const sellerPressureValue = sellerPressure(data);
   const capRate = data.property.price ? noiReal / data.property.price : 0;
-  const dealType = classifyDeal({
-    discount,
-    riskScoreValue,
-    capRate,
-    marketCap,
-    upsideScore
-  });
-  const basis = data.property.price + data.strategy.renovationBudget;
+  const dealType = relevance.isExit
+    ? classifyExitDeal({ spread: exitSpread, riskScoreValue })
+    : classifyDeal({
+        discount,
+        riskScoreValue,
+        capRate,
+        marketCap,
+        upsideScore
+      });
+  const basis = relevance.isExit ? projectCost : data.property.price + data.strategy.renovationBudget;
   const equityCreated = value - basis;
   const overPriced = equityCreated < 0;
 
   let score = 0;
   if (survivalMonths > 12) score += 30;
   else if (survivalMonths > 6) score += 15;
-  if (noiReal > 0) score += 20;
+  if (relevance.isIncome && noiReal > 0) score += 20;
+  if (relevance.isExit && exitSpread > 0) score += Math.min(20, exitSpread * 100);
   if (discount > 0) score += Math.min(20, discountRatio * 20);
   score += truth.score * 0.15;
   score -= riskScoreValue * 2;
@@ -256,11 +283,18 @@ function scoreLocally(data) {
   score = clampScore(score);
 
   const anchorMultiplier = sellerPressureValue > 3 ? 0.57 : 0.6;
-  const offer = {
-    anchor: Math.max(0, Math.round(value * anchorMultiplier)),
-    target: Math.max(0, Math.round(value * 0.7)),
-    max: Math.max(0, Math.round(value * 0.8))
-  };
+  const exitMax = Math.max(0, exitValue * 0.7 - data.strategy.renovationBudget);
+  const offer = relevance.isExit
+    ? {
+        anchor: Math.max(0, Math.round(exitMax * 0.85 * (sellerPressureValue > 3 ? 0.95 : 1))),
+        target: Math.max(0, Math.round(exitMax * 0.93)),
+        max: Math.max(0, Math.round(exitMax))
+      }
+    : {
+        anchor: Math.max(0, Math.round(value * anchorMultiplier)),
+        target: Math.max(0, Math.round(value * 0.7)),
+        max: Math.max(0, Math.round(value * 0.8))
+      };
   const strategy =
     sellerPressureValue > 3 && discount > 0
       ? "LOWBALL_AND_WAIT"
@@ -301,7 +335,12 @@ function scoreLocally(data) {
     expenseRatio: rentInPlace ? (tax + insurance + maintenance + otherExpenses) / rentInPlace : 0,
     cashOnCash: data.strategy.reserves ? cashFlow / data.strategy.reserves : 0,
     cashInvested: data.strategy.reserves,
-    dscr: debtService ? noiReal / debtService : 0
+    dscr: debtService ? noiReal / debtService : 0,
+    exitValue,
+    projectCost,
+    exitSpread,
+    resaleCosts,
+    holdingCostEstimate
   };
   const risks = [];
   if (data.property.yearBuilt && data.property.yearBuilt < 1950) risks.push("Pre-1950 building age adds systems and code risk.");
@@ -313,7 +352,8 @@ function scoreLocally(data) {
   if (truth.flags.length) risks.push(...truth.flags);
 
   const opportunities = [];
-  if (rentGap > 0 && !data.property.rentControl) opportunities.push("Market rent gap can become real upside if comps are verified.");
+  if (relevance.isIncome && rentGap > 0 && !data.property.rentControl) opportunities.push("Market rent gap can become real upside if comps are verified.");
+  if (relevance.isExit && exitSpread > 0) opportunities.push("Exit spread exists after rehab, closing, resale, and hold costs.");
   if (sellerPressureValue > 3) opportunities.push("Seller pressure is elevated from DOM or price reductions.");
   if (discount > 0) opportunities.push("Normalized value is above ask after downside expenses.");
 
@@ -341,6 +381,7 @@ function scoreLocally(data) {
       discount
     }),
     createdAt: new Date().toISOString(),
+    relevance,
     profile: {
       ...data.profile,
       dealStrategyLabel: dealType,
@@ -372,7 +413,7 @@ function scoreLocally(data) {
       label: strategy,
       sellerPressure: sellerPressureValue,
       projectCost: basis,
-      spread: value ? equityCreated / value : 0,
+      spread: relevance.isExit ? exitSpread : value ? equityCreated / value : 0,
       wholesaleSpread: data.strategy.assignmentFee
         ? data.strategy.assignmentFee / Math.max(data.property.price, 1)
         : 0

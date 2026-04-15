@@ -145,6 +145,30 @@ export default function DealCard({ deal }) {
       </div>
 
       <div className="inspection-grid">
+        <div className="inspection-list">
+          <h3>Property taxes</h3>
+          <dl className="mini-grid">
+            <Metric label="Parcel" value={deal.metrics.taxDetail.parcelNumber || "Not entered"} />
+            <Metric label="Land assessment" value={formatMoney(deal.metrics.taxDetail.landAssessment)} />
+            <Metric label="Improvements" value={formatMoney(deal.metrics.taxDetail.improvementAssessment)} />
+            <Metric label="Total assessment" value={formatMoney(deal.metrics.taxDetail.totalAssessment)} />
+            <Metric label="Tax rate" value={formatPercent(deal.metrics.taxDetail.taxRate)} />
+            <Metric label="Annual tax" value={formatMoney(deal.metrics.taxDetail.annualTax)} />
+          </dl>
+        </div>
+
+        <div className="inspection-list">
+          <h3>Assessment signal</h3>
+          <dl className="mini-grid">
+            <Metric label="Assessed tax" value={formatMoney(deal.metrics.taxDetail.assessedTax)} />
+            <Metric label="Tax in NOI" value={formatMoney(deal.metrics.tax)} />
+            <Metric label="Assessment / price" value={formatPercent(deal.property.price ? deal.metrics.taxDetail.totalAssessment / deal.property.price : 0)} />
+            <Metric label="Improvements share" value={formatPercent(deal.metrics.taxDetail.totalAssessment ? deal.metrics.taxDetail.improvementAssessment / deal.metrics.taxDetail.totalAssessment : 0)} />
+          </dl>
+        </div>
+      </div>
+
+      <div className="inspection-grid">
         <TextList
           title="Misinformation flags"
           items={deal.review.misinformation}

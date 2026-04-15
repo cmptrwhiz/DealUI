@@ -24,6 +24,11 @@ const initialForm = {
   occupancy: "92",
   yearBuilt: "",
   dom: "",
+  parcelNumber: "",
+  landAssessment: "",
+  improvementAssessment: "",
+  totalAssessment: "",
+  propertyTaxRate: "1.2",
   taxes: "",
   insurance: "",
   repairsMaintenance: "",
@@ -122,6 +127,13 @@ export default function DealForm({ onResult }) {
       vacancy: Math.max(0, 1 - toNumber(form.occupancy) / 100),
       yearBuilt: toNumber(form.yearBuilt),
       dom: toNumber(form.dom),
+      parcelNumber: form.parcelNumber,
+      assessment: {
+        land: toNumber(form.landAssessment),
+        improvements: toNumber(form.improvementAssessment),
+        total: toNumber(form.totalAssessment),
+        taxRate: toNumber(form.propertyTaxRate) / 100
+      },
       rentControl: form.rentControl
     },
     rentRoll: {
@@ -277,6 +289,30 @@ export default function DealForm({ onResult }) {
       </section>
 
       <section className="form-section">
+        <h3>Property taxes and assessment</h3>
+        <div className="field-grid three">
+          <Field label="Parcel number">
+            <input value={form.parcelNumber} onChange={updateField("parcelNumber")} placeholder="TMK / APN / parcel ID" />
+          </Field>
+          <Field label="Land assessment">
+            <input inputMode="decimal" value={form.landAssessment} onChange={updateField("landAssessment")} placeholder="450000" />
+          </Field>
+          <Field label="Improvements assessment">
+            <input inputMode="decimal" value={form.improvementAssessment} onChange={updateField("improvementAssessment")} placeholder="650000" />
+          </Field>
+          <Field label="Total assessment">
+            <input inputMode="decimal" value={form.totalAssessment} onChange={updateField("totalAssessment")} placeholder="1100000" />
+          </Field>
+          <Field label="Property tax rate %">
+            <input inputMode="decimal" value={form.propertyTaxRate} onChange={updateField("propertyTaxRate")} placeholder="1.2" />
+          </Field>
+          <Field label="Annual property taxes">
+            <input inputMode="decimal" value={form.taxes} onChange={updateField("taxes")} placeholder="13200" />
+          </Field>
+        </div>
+      </section>
+
+      <section className="form-section">
         <h3>Rent roll and leases</h3>
         <div className="field-grid three">
           <Field label="Annual current rent">
@@ -313,9 +349,6 @@ export default function DealForm({ onResult }) {
       <section className="form-section">
         <h3>Expenses and statements</h3>
         <div className="field-grid three">
-          <Field label="Taxes">
-            <input inputMode="decimal" value={form.taxes} onChange={updateField("taxes")} placeholder="11000" />
-          </Field>
           <Field label="Insurance">
             <input inputMode="decimal" value={form.insurance} onChange={updateField("insurance")} placeholder="7200" />
           </Field>

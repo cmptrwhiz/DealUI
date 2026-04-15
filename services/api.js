@@ -116,6 +116,24 @@ function sellerPressure(data) {
   return pressure;
 }
 
+function propertyTax(data) {
+  const assessment = data.property.assessment || {};
+  const totalAssessment =
+    assessment.total || assessment.land + assessment.improvements || data.property.price;
+  const taxRate = assessment.taxRate || 0.012;
+  const assessedTax = totalAssessment * taxRate;
+
+  return {
+    parcelNumber: data.property.parcelNumber,
+    landAssessment: assessment.land || 0,
+    improvementAssessment: assessment.improvements || 0,
+    totalAssessment,
+    taxRate,
+    assessedTax,
+    annualTax: data.expenses.taxes || assessedTax
+  };
+}
+
 function truthScore({ noiReported, noiReal, rentMarket, realisticMarket, expensesReported, rentInPlace, missingData }) {
   let score = 100;
   const flags = [];
@@ -186,7 +204,8 @@ function scoreLocally(data) {
   const rentRealistic = data.property.rentControl ? rentInPlace * 1.03 : Math.min(rentMarket, realisticMarket || rentMarket);
   const rentGap = rentMarket - rentInPlace;
   const upsideScore = rentMarket ? rentGap / rentMarket : 0;
-  const tax = data.expenses.taxes || data.property.price * 0.012;
+  const taxDetail = propertyTax(data);
+  const tax = taxDetail.annualTax;
   const insurance = data.expenses.insurance || Math.max(8000, rentInPlace * 0.08);
   const maintenance = data.expenses.repairsMaintenance || rentInPlace * 0.1;
   const otherExpenses = data.expenses.utilities + data.expenses.management + data.expenses.capexReserve + data.expenses.otherExpenses;
@@ -262,6 +281,7 @@ function scoreLocally(data) {
     rentGap,
     upsideScore,
     tax,
+    taxDetail,
     insurance,
     maintenance,
     expensesReported,
